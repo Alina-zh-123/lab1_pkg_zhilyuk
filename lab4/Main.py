@@ -168,6 +168,77 @@ def bresenham_circle(xc, yc, r):
     
     return unique_points, log
 
+def wu_line(x0, y0, x1, y1):
+    points = []
+    log = []
+    
+    x0, y0, x1, y1 = float(x0), float(y0), float(x1), float(y1)
+    
+    dx = x1 - x0
+    dy = y1 - y0
+    steep = abs(dy) > abs(dx)
+    
+    log.append(f"dx={dx:.3f}, dy={dy:.3f}, steep={steep}")
+    
+    if steep:
+        x0, y0 = y0, x0
+        x1, y1 = y1, x1
+        dx, dy = dy, dx
+        log.append(f"Обмен координат: ({x0:.3f}, {y0:.3f}) -> ({x1:.3f}, {y1:.3f})")
+    
+    if x0 > x1:
+        x0, x1 = x1, x0
+        y0, y1 = y1, y0
+        dx, dy = -dx, -dy
+        log.append(f"Обмен концов: ({x0:.3f}, {y0:.3f}) -> ({x1:.3f}, {y1:.3f})")
+    
+    gradient = dy / dx if dx != 0 else 0
+    log.append(f"Градиент: {gradient:.3f}")
+    
+    def plot(x, y, intensity, is_steep):
+        if is_steep:
+            points.append((y, x, intensity))
+        else:
+            points.append((x, y, intensity))
+    
+    x_start = round(x0)
+    y_start = round(y0)
+    plot(x_start, y_start, 255, steep)
+    log.append(f"Начальная точка: ({x_start}, {y_start}), интенсивность: 255")
+    
+    x_end = round(x1)
+    y_end = round(y1)
+    plot(x_end, y_end, 255, steep)
+    log.append(f"Конечная точка: ({x_end}, {y_end}), интенсивность: 255")
+    
+    intery = y0 + gradient * (round(x0) + 1 - x0)
+    log.append(f"Начальное intery: {intery:.3f}")
+    
+    x = round(x0) + 1
+    step_count = 0
+    
+    while x <= round(x1) - 1:
+        y_f = intery
+        y = math.floor(y_f)
+        frac = y_f - y
+        
+        intensity_upper = round((1 - frac) * 255)
+        intensity_lower = round(frac * 255)
+        
+        plot(x, y, intensity_upper, steep)
+        plot(x, y + 1, intensity_lower, steep)
+        
+        log.append(f"шаг {step_count}: x={x}, y_floor={y}, frac={frac:.3f}")
+        log.append(f"  верхняя точка: ({x}, {y}), интенсивность: {intensity_upper}")
+        log.append(f"  нижняя точка: ({x}, {y+1}), интенсивность: {intensity_lower}")
+        
+        intery += gradient
+        x += 1
+        step_count += 1
+    
+    log.append(f"Всего точек: {len(points)}")
+    return points, log
+
 def to_canvas_coords(x, y, scale, center_x, center_y):
     canvas_x = center_x + x * scale
     canvas_y = center_y - y * scale
@@ -221,7 +292,8 @@ class RasterApp:
             ("Пошаговый алгоритм", "naive"),
             ("Алгоритм ЦДА", "dda"), 
             ("Алгоритм Брезенхема (линия)", "bres_line"),
-            ("Алгоритм Брезенхема (окружность)", "bres_circle")
+            ("Алгоритм Брезенхема (окружность)", "bres_circle"),
+            ("Алгоритм Ву (линия)", "wu_line")
         ]
         
         for i, (label, value) in enumerate(algorithms):
@@ -230,10 +302,10 @@ class RasterApp:
                 command=self.on_algorithm_change
             ).grid(row=1+i, column=0, sticky="w", pady=2)
         
-        ttk.Label(frm, text="Координаты:", font=("Arial", 11, "bold")).grid(row=5, column=0, sticky="w", pady=(15, 5))
+        ttk.Label(frm, text="Координаты:", font=("Arial", 11, "bold")).grid(row=6, column=0, sticky="w", pady=(15, 5))
         
         coord_frame = ttk.Frame(frm)
-        coord_frame.grid(row=6, column=0, sticky="w", pady=5)
+        coord_frame.grid(row=7, column=0, sticky="w", pady=5)
         
         ttk.Label(coord_frame, text="Начальная точка:").grid(row=0, column=0, columnspan=4, sticky="w")
         ttk.Label(coord_frame, text="x0:").grid(row=1, column=0, padx=(0, 2))
@@ -259,15 +331,15 @@ class RasterApp:
         self.y1_entry.insert(0, "6")
         
         btn_frame = ttk.Frame(frm)
-        btn_frame.grid(row=7, column=0, pady=10)
+        btn_frame.grid(row=8, column=0, pady=10)
         
         ttk.Button(btn_frame, text="Построить", command=self.on_draw).grid(row=0, column=0, padx=5)
         ttk.Button(btn_frame, text="Очистить", command=self.on_clear).grid(row=0, column=1, padx=5)
         
-        ttk.Label(frm, text="Масштаб:", font=("Arial", 11, "bold")).grid(row=8, column=0, sticky="w", pady=(15, 5))
+        ttk.Label(frm, text="Масштаб:", font=("Arial", 11, "bold")).grid(row=9, column=0, sticky="w", pady=(15, 5))
         
         scale_frame = ttk.Frame(frm)
-        scale_frame.grid(row=9, column=0, sticky="w", pady=5)
+        scale_frame.grid(row=10, column=0, sticky="w", pady=5)
         
         self.scale_var = tk.IntVar(value=self.scale)
         self.scale_slider = ttk.Scale(
@@ -285,12 +357,12 @@ class RasterApp:
         self.scale_label.grid(row=1, column=0, sticky="w")
         
         self.time_label = ttk.Label(frm, text="Время: ---", font=("Arial", 10))
-        self.time_label.grid(row=10, column=0, sticky="w", pady=(15, 5))
+        self.time_label.grid(row=11, column=0, sticky="w", pady=(15, 5))
         
-        ttk.Label(frm, text="Вычисления:", font=("Arial", 11, "bold")).grid(row=11, column=0, sticky="w", pady=(15, 5))
+        ttk.Label(frm, text="Вычисления:", font=("Arial", 11, "bold")).grid(row=12, column=0, sticky="w", pady=(15, 5))
         
         log_frame = ttk.Frame(frm)
-        log_frame.grid(row=12, column=0, sticky="nsew", pady=5)
+        log_frame.grid(row=13, column=0, sticky="nsew", pady=5)
         
         self.log_text = tk.Text(log_frame, width=45, height=15, font=TEXT_FONT, wrap=tk.WORD)
         scrollbar = ttk.Scrollbar(log_frame, orient="vertical", command=self.log_text.yview)
@@ -302,7 +374,7 @@ class RasterApp:
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
         
-        frm.rowconfigure(12, weight=1)
+        frm.rowconfigure(13, weight=1)
 
     def on_canvas_resize(self, event):
         self.center_x = event.width // 2
@@ -365,17 +437,26 @@ class RasterApp:
         self.canvas.create_text(10, 10, text=f"Масштаб: 1 ед = {s} px", 
                                anchor="nw", font=("Arial", 9), tags="info")
 
-    def draw_raster_square(self, x, y):
+    def draw_raster_square(self, x, y, intensity=255):
         canvas_x, canvas_y = to_canvas_coords(x, y, self.scale, self.center_x, self.center_y)
         
         pixel_size = self.scale - 1
         half_pixel = pixel_size // 2
         
-        self.canvas.create_rectangle(
-            canvas_x - half_pixel, canvas_y - half_pixel,
-            canvas_x + half_pixel, canvas_y + half_pixel,
-            fill=RASTER_COLOR, outline=RASTER_COLOR, tags="raster"
-        )
+        if intensity < 255:
+            gray_value = 255 - intensity
+            color = f"#{gray_value:02x}{gray_value:02x}{gray_value:02x}"
+            self.canvas.create_rectangle(
+                canvas_x - half_pixel, canvas_y - half_pixel,
+                canvas_x + half_pixel, canvas_y + half_pixel,
+                fill=color, outline=color, tags="raster"
+            )
+        else:
+            self.canvas.create_rectangle(
+                canvas_x - half_pixel, canvas_y - half_pixel,
+                canvas_x + half_pixel, canvas_y + half_pixel,
+                fill=RASTER_COLOR, outline=RASTER_COLOR, tags="raster"
+            )
 
     def draw_point(self, x, y, color=POINT_COLOR, highlight=False):
         canvas_x, canvas_y = to_canvas_coords(x, y, self.scale, self.center_x, self.center_y)
@@ -432,8 +513,18 @@ class RasterApp:
             except:
                 pass
         
-        for point in self.last_points:
-            self.draw_raster_square(point[0], point[1])
+        if algorithm == "wu_line":
+            for point in self.last_points:
+                x, y, intensity = point
+                self.draw_raster_square(x, y, intensity)
+        else:
+            for point in self.last_points:
+                if len(point) == 2:
+                    x, y = point
+                    self.draw_raster_square(x, y)
+                elif len(point) == 3:
+                    x, y, intensity = point
+                    self.draw_raster_square(x, y, intensity)
         
         if algorithm != "bres_circle" and len(highlight_points) == 2:
             points_list = list(highlight_points)
@@ -495,6 +586,8 @@ class RasterApp:
             points, log = bresenham_line(x0, y0, x1, y1)
         elif algorithm == "bres_circle":
             points, log = bresenham_circle(x0, y0, x1)
+        elif algorithm == "wu_line":
+            points, log = wu_line(x0, y0, x1, y1)
         else:
             points, log = [], ["Неизвестный алгоритм"]
         
@@ -505,6 +598,7 @@ class RasterApp:
         
         if algorithm != "bres_circle":
             header = [
+                f"Алгоритм: {algorithm}",
                 f"Начальная точка: ({x0}, {y0})",
                 f"Конечная точка: ({x1}, {y1})",
                 f"Количество точек: {len(points)}",
