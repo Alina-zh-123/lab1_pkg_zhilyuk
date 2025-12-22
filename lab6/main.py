@@ -1,3 +1,4 @@
+import time
 import matplotlib
 
 try:
@@ -183,11 +184,16 @@ sli_tx = Slider(ax_tx, 'X', -3.0, 3.0, valinit=0.0)
 sli_ty = Slider(ax_ty, 'Y', -3.0, 3.0, valinit=0.0)
 sli_tz = Slider(ax_tz, 'Z', -3.0, 3.0, valinit=0.0)
 
+last_update_time = 0
+update_interval = 3
 
-def update_draw():
-    M = get_matrix(sli_tx.val, sli_ty.val, sli_tz.val, sli_s.val,
-                   rot_state['rx'], rot_state['ry'], 0)
-
+def update_draw(force=False):
+    global last_update_time 
+    now = time.time() 
+    if not force and (now - last_update_time < update_interval): 
+        return 
+    last_update_time = now 
+    M = get_matrix(sli_tx.val, sli_ty.val, sli_tz.val, sli_s.val, rot_state['rx'], rot_state['ry'], 0) 
     transformed = M @ base_verts
 
     ax_3d.clear()
@@ -247,7 +253,6 @@ def on_press(event):
 def on_release(event):
     rot_state['dragging'] = False
 
-
 def on_motion(event):
     if rot_state['dragging'] and event.inaxes == ax_3d:
         dx = event.x - rot_state['last_x']
@@ -256,9 +261,8 @@ def on_motion(event):
         rot_state['rx'] -= dy * 0.01
         rot_state['last_x'] = event.x
         rot_state['last_y'] = event.y
-        update_draw()
-
-
+        update_draw() 
+        
 fig.canvas.mpl_connect('button_press_event', on_press)
 fig.canvas.mpl_connect('button_release_event', on_release)
 fig.canvas.mpl_connect('motion_notify_event', on_motion)
